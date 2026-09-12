@@ -1,0 +1,53 @@
+### 1. Check seeded inventory
+GET http://localhost:8082/api/inventory/LAPTOP-PRO-14
+
+### 2. Successful checkout
+POST http://localhost:8081/api/orders
+Content-Type: application/json
+Idempotency-Key: demo-order-success-0001
+
+{
+  "customerId": "9cd71fd3-ab62-4d44-b564-f70f05d8af34",
+  "paymentMethodToken": "tok_demo_success",
+  "items": [
+    {
+      "sku": "LAPTOP-PRO-14",
+      "productName": "Pro Laptop 14",
+      "quantity": 1,
+      "unitPrice": 1499.00
+    },
+    {
+      "sku": "MOUSE-WL-02",
+      "productName": "Wireless Mouse",
+      "quantity": 2,
+      "unitPrice": 29.50
+    }
+  ]
+}
+
+### 3. Payment failure / compensation path
+POST http://localhost:8081/api/orders
+Content-Type: application/json
+Idempotency-Key: demo-order-failure-0001
+
+{
+  "customerId": "9cd71fd3-ab62-4d44-b564-f70f05d8af34",
+  "paymentMethodToken": "fail_test_card",
+  "items": [
+    {
+      "sku": "MECH-KEY-01",
+      "productName": "Mechanical Keyboard",
+      "quantity": 2,
+      "unitPrice": 89.00
+    }
+  ]
+}
+
+### Replace ORDER_ID from a create response
+GET http://localhost:8081/api/orders/ORDER_ID
+
+### Payment result
+GET http://localhost:8083/api/payments/order/ORDER_ID
+
+### Notification log
+GET http://localhost:8084/api/notifications/order/ORDER_ID

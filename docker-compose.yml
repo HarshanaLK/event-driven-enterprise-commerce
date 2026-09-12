@@ -1,0 +1,179 @@
+services:
+  broker:
+    image: apache/kafka:4.3.1
+    hostname: broker
+    container_name: commerce-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT_HOST://localhost:9092,PLAINTEXT://broker:19092"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@broker:29093"
+      KAFKA_LISTENERS: "CONTROLLER://:29093,PLAINTEXT_HOST://:9092,PLAINTEXT://:19092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      CLUSTER_ID: "4L6g3nShT-eMCtK--X86sw"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  orders-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: orders
+      MYSQL_USER: commerce
+      MYSQL_PASSWORD: commerce
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - orders-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ucommerce -pcommerce --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  inventory-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: inventory
+      MYSQL_USER: commerce
+      MYSQL_PASSWORD: commerce
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3308:3306"
+    volumes:
+      - inventory-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ucommerce -pcommerce --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  payments-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: payments
+      MYSQL_USER: commerce
+      MYSQL_PASSWORD: commerce
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3309:3306"
+    volumes:
+      - payments-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ucommerce -pcommerce --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  notifications-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: notifications
+      MYSQL_USER: commerce
+      MYSQL_PASSWORD: commerce
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3310:3306"
+    volumes:
+      - notifications-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ucommerce -pcommerce --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  order-service:
+    build:
+      context: .
+      args:
+        MODULE: order-service
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:mysql://orders-db:3306/orders?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: commerce
+      DB_PASSWORD: commerce
+      KAFKA_BOOTSTRAP_SERVERS: broker:19092
+    ports:
+      - "8081:8081"
+    depends_on:
+      broker:
+        condition: service_healthy
+      orders-db:
+        condition: service_healthy
+
+  inventory-service:
+    build:
+      context: .
+      args:
+        MODULE: inventory-service
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:mysql://inventory-db:3306/inventory?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: commerce
+      DB_PASSWORD: commerce
+      KAFKA_BOOTSTRAP_SERVERS: broker:19092
+    ports:
+      - "8082:8082"
+    depends_on:
+      broker:
+        condition: service_healthy
+      inventory-db:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: .
+      args:
+        MODULE: payment-service
+    environment:
+      SERVER_PORT: 8083
+      DB_URL: jdbc:mysql://payments-db:3306/payments?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: commerce
+      DB_PASSWORD: commerce
+      KAFKA_BOOTSTRAP_SERVERS: broker:19092
+    ports:
+      - "8083:8083"
+    depends_on:
+      broker:
+        condition: service_healthy
+      payments-db:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      args:
+        MODULE: notification-service
+    environment:
+      SERVER_PORT: 8084
+      DB_URL: jdbc:mysql://notifications-db:3306/notifications?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: commerce
+      DB_PASSWORD: commerce
+      KAFKA_BOOTSTRAP_SERVERS: broker:19092
+    ports:
+      - "8084:8084"
+    depends_on:
+      broker:
+        condition: service_healthy
+      notifications-db:
+        condition: service_healthy
+
+volumes:
+  orders-data:
+  inventory-data:
+  payments-data:
+  notifications-data:
